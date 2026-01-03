@@ -71,3 +71,11 @@ func CallHeartbeat(addr string, args *HeartbeatArgs) (*HeartbeatReply, bool) {
 		args,
 	)
 }
+
+func CallGet(addr string, args *GetArgs) (*GetReply, bool) {
+	return CallRPC[GetArgs, GetReply](
+		addr,
+		"Node.HandleGet",
+		args,
+	)
+}
