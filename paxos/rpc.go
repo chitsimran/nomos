@@ -40,3 +40,13 @@ type HeartbeatArgs struct {
 type HeartbeatReply struct {
 	Ok bool
 }
+
+type GetArgs struct {
+	Key string
+}
+
+type GetReply struct {
+	Value    string
+	Ok       bool
+	LeaderID int
+}

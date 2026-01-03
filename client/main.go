@@ -121,6 +121,19 @@ func startREPL(nodeID int, node *paxos.Node) {
 				fmt.Println(err)
 			}
 
+		case "get":
+			if len(parts) != 2 {
+				fmt.Println("usage: get <key>")
+				continue
+			}
+
+			result, ok := node.GetKey(parts[1])
+			if !ok {
+				fmt.Println("Get FAILED with: ", result)
+				continue
+			}
+			fmt.Println(result)
+
 		case "kv":
 			node.PrintKV()
 

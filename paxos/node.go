@@ -493,6 +493,32 @@ func (n *Node) HandleHeartbeat(args *HeartbeatArgs, reply *HeartbeatReply) error
 	return nil
 }
 
+func (n *Node) GetKey(key string) (string, bool) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if !n.isLeader || n.recovering {
+		return "Not leader, please read from Leader Node " + string(rune(n.leaderBallot.NodeID)), false
+	}
+
+	return n.kv.Get(key)
+}
+
+func (n *Node) HandleGet(args *GetArgs, reply *GetReply) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if !n.isLeader || n.recovering {
+		reply.Ok = false
+		reply.LeaderID = n.leaderBallot.NodeID
+		return nil
+	}
+
+	reply.Value, _ = n.kv.Get(args.Key)
+	reply.Ok = true
+	return nil
+}
+
 func (n *Node) Status() string {
 	n.mu.Lock()
 	defer n.mu.Unlock()
