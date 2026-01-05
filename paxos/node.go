@@ -116,6 +116,7 @@ func (n *Node) LoadFromWAL() error {
 		fmt.Println("Error loading WAL record:", err)
 		return err
 	}
+	n.leaderBallot = n.promisedBallot
 
 	maxSlot := 0
 	for slot := range n.log {
@@ -125,6 +126,7 @@ func (n *Node) LoadFromWAL() error {
 	}
 	n.nextSlot = maxSlot + 1
 	n.applyCond.Signal()
+	n.lastHeartbeat[n.leaderBallot.NodeID] = time.Now()
 	return nil
 }
 
@@ -458,7 +460,7 @@ func (n *Node) ElectionLoop() {
 		if time.Since(n.lastHeartbeat[n.leaderBallot.NodeID]) > n.electionTimeout {
 			n.lastHeartbeat[n.leaderBallot.NodeID] = time.Now() // prevents election storm
 			n.mu.Unlock()
-			log.Printf("Election lost heartbeat from %s", n.leaderBallot)
+			log.Printf("Election lost heartbeat from %v", n.leaderBallot)
 			log.Println("Starting my own Leader Election")
 			go n.RunPrepare()
 		} else {
