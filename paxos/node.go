@@ -262,6 +262,7 @@ func (n *Node) runAcceptForSlot(args *AcceptArgs) error {
 				n.mu.Lock()
 				n.isLeader = false
 				n.mu.Unlock()
+				log.Printf("I'm NO LONGER the leader :|")
 				return nil
 			}
 			continue
@@ -483,7 +484,10 @@ func (n *Node) HandleHeartbeat(args *HeartbeatArgs, reply *HeartbeatReply) error
 		n.leaderBallot = args.LeaderBallot
 	}
 
-	n.isLeader = false
+	if n.isLeader {
+		n.isLeader = false
+		log.Printf("I'm NO LONGER the leader :|")
+	}
 
 	n.lastHeartbeat[args.LeaderBallot.NodeID] = time.Now()
 

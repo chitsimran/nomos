@@ -13,16 +13,19 @@ Client commands are replicated using Multi-Paxos:
 Only the leader supports client reads and writes, which simplifies correctness and ensures linearizability.
 
 ## High-Level Design
-This section gives a quick overview of the system. (more details in Design section)
+This section gives a quick overview of the system.
 
 All reads and writes go through the Leader node which ensures linearizability. Thus, the system can be divided into two phases: Leader election and client operations.
 
 Once a leader is elected, subsequent client commands bypass the Prepare phase and directly execute Accept rounds, as long as the leader remains non-faulty. For any client operation, leader will send Accept RPC to other nodes.
 
 ### Phase 1 - Leader Election
-Leader periodically sends heartbeats to all nodes. If a node hasn't heard from the leader in a certain set time, it will start leader election. Multiple nodes may try to run election phase at the same time. 
-Each node has a local variable `currentBallot` which specifies the ballot with which the node will attempt to become a leader. 
+Leader periodically sends heartbeats to all nodes. If a node hasn't heard from the leader in a certain set time, it will start leader election. Multiple nodes may try to run election phase at the same time.
+
+Each node has a local variable `currentBallot` which specifies the ballot with which the node will attempt to become a leader.
+
 When a node receives election message it will accept the highest ballot it has seen so far. When a node accepts a ballot it promises to never accept a command with ballot smaller than the promised ballot. This is stored in `promisedBallot` and also stored on disk.
+
 `leaderBallot` tracks the ballot of the current known leader and is currently equivalent to `promisedBallot`. This may be removed in future revisions.
 
 ### Phase 2 - Client Operations
@@ -32,8 +35,11 @@ Once a leader is elected it will serve all client read and write operations as l
 For each client write, a slot is chosen for that command. This is decided by leader and is accepted by majority nodes. Once a quorum of accepts is received, leader commits the command (i.e. applies to the state machine). This commit information is propagated to other nodes via a Commit RPC, allowing followers to advance their `commitIndex`.
 
 Replicated log has the following variables:
-`lastApplied` - this specifies the latest slot that was applied locally, a slot can be only applied if all slots <= current slot have been applied 
-`commitIndex` - this specifies the slot upto which a node can safely apply (i.e. upto which slot a quorum of accepts have been received and are ready to be committed)
+
+`lastApplied` - this specifies the latest slot that was applied locally, a slot can be only applied if all slots <= current slot have been applied
+
+`commitIndex` - this specifies the slot upto which a node can safely apply (i.e. upto which slot a quorum of accepts have been received and are ready to be committed), this is logged to disk
+
 `nextSlot` - this specifies the slot for next client command. Although it's stored on each node, it is meaningless on non-leader nodes. Only the leader uses this for client operations.
 
 ![log_variables](./resources/nomos-log-variables.png)
@@ -58,8 +64,11 @@ A new node will try to become the leader. In the above example, lets say P0 fail
 How does the new leader construct upto date log?
 
 Whenever a node "accepts" a Prepare message (leader election message), it returns its own log entries along with the promise. The new "wannabe" leader will then check if it's missing any log entry. If it is missing a log entry or if an entry it has is outdated (old ballot) it will merge its own local log with the log entries it receives from other nodes.
+
 Since we ensure a command is only applied if quorum nodes respond with OK, the new leader will intersect with at least one node that contains the missing log entries. This helps in reconstructing upto date log.
+
 The nodes also log (to disk) the `commitIndex`. For all the log entries <= `commitIndex` the new leader will safely apply them locally and does not need to communicate this to other nodes.
+
 For newly recovered log entries beyond the `commitIndex`, the new leader will try to get them "Accept"-ed by a majority of nodes. If accepted, they're also applied.
 > Important: When the leader is recovering, it does not accept any client commands. This helps it safely recover and reconcile its log.
 
@@ -73,38 +82,6 @@ Leader election is driven by ballot-based Prepare rounds and randomized election
 2. Command Replication
 - **Safety**: No two nodes ever apply different commands for the same log slot
 - **Liveness**: Logs at all nodes eventually converge
-
-## Design
-The following section goes a bit more into detail.
-Nomos enforces a single active leader at any time.
-All client reads and writes go through the leader, which ensures linearizability.
-
-### Consensus & Replication
-
-Nomos uses Multi-Paxos to replicate a sequence of commands across nodes.
-
-- Leader election is performed using ballot-based Prepare rounds.
-- Each log slot is chosen via quorum-based Accept rounds.
-- A slot is considered committed once a majority of nodes accept it.
-- Committed entries are applied in order to the state machine.
-
-### Leader Election & Failure Detection
-
-- Leaders periodically send heartbeats to followers 
-- Followers track the time since the last heartbeat 
-- If a follower does not receive a heartbeat within its randomized election timeout, it initiates a new Prepare phase 
-- Randomized election timeouts ensure liveness by preventing repeated split votes
-
-### Recovery & Log Reconstruction
-
-When a node becomes leader, it reconstructs the log by collecting accepted entries from a quorum during the Prepare phase.
-
-Key recovery properties:
-- For each slot, the value with the highest ballot is selected 
-- Recovered entries are persisted to disk before being applied 
-- The leader re-proposes recovered entries to ensure consistency
-
-This ensures that committed commands are never lost, even if the new leader crashes during recovery.
 
 ## Node State and key variables
 Each node maintains the following important state:
