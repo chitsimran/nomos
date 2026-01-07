@@ -53,11 +53,11 @@ The following is an example system state of nomos. For this example, we have a c
 
 ### Failure Recovery
 
-What happens when the leader fails?\
+**What happens when the leader fails?**\
 A new node will try to become the leader. In the above example, lets say P0 fails and P1 detects it first and starts leader election. It will receive a vote from P2 and from itself. This will promote it to leader since it has received a quorum votes.
 
 
-How does the new leader construct upto date log?\
+**How does the new leader construct upto date log?**\
 Whenever a node "accepts" a Prepare message (leader election message), it returns its own log entries along with the promise. The new "wannabe" leader will then check if it's missing any log entry. If it is missing a log entry or if an entry it has is outdated (old ballot) it will merge its own local log with the log entries it receives from other nodes.\
 Since we ensure a command is only applied if quorum nodes respond with OK, the new leader will intersect with at least one node that contains the missing log entries. This helps in reconstructing upto date log.\
 The nodes also log (to disk) the `commitIndex`. For all the log entries <= `commitIndex` the new leader will safely apply them locally and does not need to communicate this to other nodes.\
