@@ -117,6 +117,7 @@ func (n *Node) LoadFromWAL() error {
 		return err
 	}
 	n.leaderBallot = n.promisedBallot
+	n.currentBallot.InitializeWith(n.promisedBallot.Number+1, n.ID)
 
 	maxSlot := 0
 	for slot := range n.log {
