@@ -31,3 +31,8 @@ func (b *Ballot) Increment(nodeID int) {
 	b.Number++
 	b.NodeID = nodeID
 }
+
+func (b *Ballot) InitializeWith(number int, nodeID int) {
+	b.Number = number
+	b.NodeID = nodeID
+}
