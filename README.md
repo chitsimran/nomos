@@ -34,12 +34,9 @@ Once a leader is elected it will serve all client read and write operations as l
 
 For each client write, a slot is chosen for that command. This is decided by leader and is accepted by majority nodes. Once a quorum of accepts is received, leader commits the command (i.e. applies to the state machine). This commit information is propagated to other nodes via a Commit RPC, allowing followers to advance their `commitIndex`.
 
-Replicated log has the following variables:
-
-`lastApplied` - this specifies the latest slot that was applied locally, a slot can be only applied if all slots <= current slot have been applied
-
-`commitIndex` - this specifies the slot upto which a node can safely apply (i.e. upto which slot a quorum of accepts have been received and are ready to be committed), this is logged to disk
-
+Replicated log has the following variables:\
+`lastApplied` - this specifies the latest slot that was applied locally, a slot can be only applied if all slots <= current slot have been applied\
+`commitIndex` - this specifies the slot upto which a node can safely apply (i.e. upto which slot a quorum of accepts have been received and are ready to be committed), this is logged to disk\
 `nextSlot` - this specifies the slot for next client command. Although it's stored on each node, it is meaningless on non-leader nodes. Only the leader uses this for client operations.
 
 ![log_variables](./resources/nomos-log-variables.png)
@@ -51,24 +48,19 @@ The following is an example system state of nomos. For this example, we have a c
 - P0 is the leader node; Leader always has the latest log
 - Other nodes (P1 and P2) can be lagging behind (as shown in the example, each of them is missing a log entry; P1 is missing log at index 4 and P2 is missing log at index 3)
 - Green slots represents log entries (or commands) that have been applied (or committed)
-- Red slot represents the slot upto which a client can safely apply log entries but iff all log entries before it have been applied; in the example, even though P2 has log entry for index 4, it can not apply it yet since it's missing entry 3
+- Red slot represents the slot upto which a client can safely apply log entries but iff all log entries before it have been applied; in the example, even though P2 has log entry for index 4, it can not apply it yet since it's missing entry 3 (it has however still accepted the value at index 4)
 - Blue slot represents the next slot at which the leader will insert a new client command
 
 ### Failure Recovery
 
-What happens when the leader fails?
-
+What happens when the leader fails?\
 A new node will try to become the leader. In the above example, lets say P0 fails and P1 detects it first and starts leader election. It will receive a vote from P2 and from itself. This will promote it to leader since it has received a quorum votes.
 
 
-How does the new leader construct upto date log?
-
-Whenever a node "accepts" a Prepare message (leader election message), it returns its own log entries along with the promise. The new "wannabe" leader will then check if it's missing any log entry. If it is missing a log entry or if an entry it has is outdated (old ballot) it will merge its own local log with the log entries it receives from other nodes.
-
-Since we ensure a command is only applied if quorum nodes respond with OK, the new leader will intersect with at least one node that contains the missing log entries. This helps in reconstructing upto date log.
-
-The nodes also log (to disk) the `commitIndex`. For all the log entries <= `commitIndex` the new leader will safely apply them locally and does not need to communicate this to other nodes.
-
+How does the new leader construct upto date log?\
+Whenever a node "accepts" a Prepare message (leader election message), it returns its own log entries along with the promise. The new "wannabe" leader will then check if it's missing any log entry. If it is missing a log entry or if an entry it has is outdated (old ballot) it will merge its own local log with the log entries it receives from other nodes.\
+Since we ensure a command is only applied if quorum nodes respond with OK, the new leader will intersect with at least one node that contains the missing log entries. This helps in reconstructing upto date log.\
+The nodes also log (to disk) the `commitIndex`. For all the log entries <= `commitIndex` the new leader will safely apply them locally and does not need to communicate this to other nodes.\
 For newly recovered log entries beyond the `commitIndex`, the new leader will try to get them "Accept"-ed by a majority of nodes. If accepted, they're also applied.
 > Important: When the leader is recovering, it does not accept any client commands. This helps it safely recover and reconcile its log.
 
@@ -97,21 +89,6 @@ Commands are only applied when:
 - they are present in the log 
 - their slot index ≤ commitIndex 
 - all prior slots have been applied
-
-## Persistence & Durability
-
-Nomos uses a write-ahead log (WAL) to ensure crash safety.
-
-- Promises, accepts, and commits are durably logged before affecting in-memory state.
-- On restart, nodes replay the WAL to reconstruct their log and commit index.
-- Recovered log entries learned during leader election are also persisted to avoid data loss.
-
-## Read & Write Semantics
-
-- Writes are linearizable and replicated using Multi-Paxos.
-- Reads are served by the current leader only.
-- Followers reject reads to prevent stale data exposure.
-- The leader does not serve reads or writes while recovering.
 
 ## Fault Tolerance Guarantees
 
@@ -146,20 +123,13 @@ Dynamic membership is not currently supported.
 
 Each node runs an interactive REPL with the following commands:
 
-`prepare` Manually triggers a leader election (Prepare phase) (was mainly used for initial testing)
-
-`put <key> <value>` Submits a write request to the leader
-
-`get <key>` Reads a value from the leader (followers reject)
-
-`status` Prints the node’s internal state (ballots, indices, role)
-
-`kv` Prints the current key-value store contents
-
-`log` Prints the current local log
-
-`ping <addr>` Sends a ping RPC to another node (for connectivity testing)
-
+`prepare` Manually triggers a leader election (Prepare phase) (was mainly used for initial testing)\
+`put <key> <value>` Submits a write request to the leader\
+`get <key>` Reads a value from the leader (followers reject)\
+`status` Prints the node’s internal state (ballots, indices, role)\
+`kv` Prints the current key-value store contents\
+`log` Prints the current local log\
+`ping <addr>` Sends a ping RPC to another node (for connectivity testing)\
 `exit` Shuts down the node
 
 ## Limitations & Future Work
@@ -183,6 +153,6 @@ Future improvements include following (in no particular order):
 ## References
 
 1. https://lamport.azurewebsites.net/pubs/paxos-simple.pdf
-2. https://www.youtube.com/watch?v=JEpsBg0AO6o
-3. https://www.youtube.com/watch?v=vYp4LYbnnW8
+2. [John Ousterhout's lecture on Paxos (and Multi-Paxos)](https://www.youtube.com/watch?v=JEpsBg0AO6o)
+3. [John Ousterhout's talk on Raft](https://www.youtube.com/watch?v=vYp4LYbnnW8)
 4. https://raft.github.io/raft.pdf
